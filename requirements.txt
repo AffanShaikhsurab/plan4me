@@ -1,0 +1,24 @@
+# ---- Core backend (installable everywhere, no heavy ML deps) ----
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.6
+python-dotenv>=1.0
+
+# MCP server (Cursor / Claude agents) — SDK 2.x uses MCPServer (not FastMCP)
+mcp>=2.0.0
+
+# LLM / agent orchestration
+langchain>=0.3.27
+langgraph>=0.2.60
+langchain-aws>=0.2.10
+boto3>=1.35
+numpy>=1.26
+
+# Ingestion
+yt-dlp>=2025.1.15
+youtube-transcript-api>=1.0.0
+deepgram-sdk>=7.6.0
+
+# ---- Optional: local transcription fallback (may lack wheels on Py3.14) ----
+# Install separately:  pip install -r requirements-whisper.txt

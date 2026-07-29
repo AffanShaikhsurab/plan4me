@@ -1,0 +1,4 @@
+# Optional local transcription fallback.
+# faster-whisper pulls in ctranslate2 + torch, which may not have wheels
+# for very new Python versions. Only needed for videos WITHOUT captions.
+faster-whisper>=1.1.0

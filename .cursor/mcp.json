@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "plan4me": {
+      "command": "C:\\Users\\affan\\Fun Projects\\plan4me\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "mcp_server"],
+      "cwd": "C:\\Users\\affan\\Fun Projects\\plan4me",
+      "env": {
+        "PYTHONPATH": "C:\\Users\\affan\\Fun Projects\\plan4me"
+      }
+    }
+  }
+}

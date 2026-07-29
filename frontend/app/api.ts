@@ -47,6 +47,34 @@ export interface HealthInfo {
   whisper_fallback: boolean;
 }
 
+export type ResearchStage =
+  | "search"
+  | "transcribe"
+  | "extract"
+  | "cluster"
+  | "synthesize"
+  | "done";
+
+export interface ResearchCounts {
+  videos?: number;
+  transcripts?: number;
+  atoms?: number;
+  clusters?: number;
+}
+
+export interface ResearchJob {
+  job_id: string;
+  topic: string;
+  status: "running" | "done" | "error";
+  stage: ResearchStage;
+  completed_stages: string[];
+  stage_order: string[];
+  counts: ResearchCounts;
+  elapsed_seconds: number;
+  report: KnowledgeReport | null;
+  error: string | null;
+}
+
 async function jsonOrThrow<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -87,4 +115,20 @@ export async function buildReport(
     body: JSON.stringify({ topic, max_videos: maxVideos }),
   });
   return jsonOrThrow<KnowledgeReport>(res);
+}
+
+export async function startResearch(
+  topic: string,
+  maxVideos: number
+): Promise<ResearchJob> {
+  const res = await fetch(`${API_BASE}/research`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, max_videos: maxVideos }),
+  });
+  return jsonOrThrow<ResearchJob>(res);
+}
+
+export async function getResearchJob(jobId: string): Promise<ResearchJob> {
+  return jsonOrThrow<ResearchJob>(await fetch(`${API_BASE}/research/${jobId}`));
 }

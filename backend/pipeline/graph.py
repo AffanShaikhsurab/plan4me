@@ -10,7 +10,7 @@ few atoms, or loop for more videos if coverage is low) without restructuring.
 from __future__ import annotations
 
 import logging
-from typing import Optional, TypedDict
+from typing import Iterator, Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -99,12 +99,28 @@ def build_graph():
 GRAPH = build_graph()
 
 
-def run_pipeline(topic: str, max_videos: int | None = None,
-                 languages: list[str] | None = None) -> PipelineState:
+def _initial_state(topic: str, max_videos: int | None,
+                   languages: list[str] | None) -> PipelineState:
     settings = get_settings()
-    initial: PipelineState = {
+    return {
         "topic": topic,
         "max_videos": max_videos or settings.default_max_videos,
         "languages": languages,
     }
-    return GRAPH.invoke(initial)
+
+
+def run_pipeline(topic: str, max_videos: int | None = None,
+                 languages: list[str] | None = None) -> PipelineState:
+    return GRAPH.invoke(_initial_state(topic, max_videos, languages))
+
+
+def stream_pipeline(topic: str, max_videos: int | None = None,
+                    languages: list[str] | None = None
+                    ) -> Iterator[tuple[str, PipelineState]]:
+    """Yield `(node_name, state_update)` as each stage of the graph finishes.
+
+    Lets callers report progress on a run that takes minutes end to end.
+    """
+    for chunk in GRAPH.stream(_initial_state(topic, max_videos, languages)):
+        for node, update in chunk.items():
+            yield node, update

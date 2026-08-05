@@ -1,0 +1,171 @@
+# plan4me
+
+Turn hours of YouTube interviews, talks, and podcasts into one **evidence-backed knowledge guide**.
+
+plan4me searches YouTube for a topic, pulls transcripts (captions, optional Deepgram/Whisper), extracts cited “knowledge atoms” with Amazon Bedrock, clusters overlapping claims, and synthesizes a Markdown report you can read in the web UI—or hand to a coding agent via MCP.
+
+## Features
+
+- **Topic → knowledge guide** — search, transcribe, extract, cluster, synthesize
+- **Cited insights** — claims tied back to videos (and timestamps when available)
+- **Web app** — Next.js UI with stage progress and a Markdown guide reader
+- **Async research jobs** — start a run, poll progress (`search` → `synthesize`)
+- **MCP server** — Cursor / Claude agents can call `health`, `search_videos`, `research_topic`, `get_latest_report`
+- **Cursor skill + agent** — project skill `video-research` and agent `video-researcher` under `.cursor/`
+
+## Tech stack
+
+| Layer | Stack |
+|-------|--------|
+| Frontend | Next.js 15, React 19, TypeScript, react-markdown |
+| API | FastAPI, Uvicorn, Pydantic Settings |
+| Pipeline | LangGraph / LangChain, Amazon Bedrock (extraction + synthesis + Titan embeddings) |
+| Ingestion | yt-dlp, youtube-transcript-api, optional Deepgram / faster-whisper |
+| Storage | SQLite (`plan4me.db`) |
+| Agents | MCP stdio server (`mcp_server`), Cursor skills/agents |
+
+## Quick start
+
+### Prerequisites
+
+- **Python 3.11+** recommended (very new Pythons may lack wheels for optional Whisper deps)
+- **Node.js 20+** (for the frontend)
+- **AWS credentials** with Bedrock access in your region (models must be enabled)
+- Optional: **Deepgram API key** for caption-less top videos
+- Optional: **ffmpeg** on `PATH` if you use Deepgram/Whisper audio paths
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/AffanShaikhsurab/plan4me.git
+cd plan4me
+cp .env.example .env
+# Edit .env — set AWS region/models; optionally DEEPGRAM_API_KEY
+```
+
+PowerShell:
+
+```powershell
+git clone https://github.com/AffanShaikhsurab/plan4me.git
+Set-Location plan4me
+Copy-Item .env.example .env
+# Edit .env
+```
+
+Credentials use the standard AWS chain (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, `~/.aws/credentials`, SSO, etc.).
+
+### 2. Backend
+
+```bash
+python -m venv .venv
+# macOS/Linux:
+source .venv/bin/activate
+# Windows PowerShell:
+# .\.venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt
+# Optional local Whisper fallback:
+# pip install -r requirements-whisper.txt
+
+uvicorn backend.api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)  
+Bedrock check: [http://127.0.0.1:8000/health/bedrock](http://127.0.0.1:8000/health/bedrock)
+
+### 3. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The UI calls `http://localhost:8000` by default (`NEXT_PUBLIC_API_BASE`).
+
+### 4. Smoke test (no UI)
+
+```bash
+# From repo root, venv active
+python -m scripts.smoke_test
+# Include Bedrock extraction/synthesis (costs tokens):
+python -m scripts.smoke_test --full --topic "B2B SaaS pricing interviews"
+```
+
+## Environment variables
+
+See [`.env.example`](.env.example). Summary:
+
+| Variable | Purpose |
+|----------|---------|
+| `AWS_REGION` | Bedrock region (default `us-east-1`) |
+| `EXTRACTION_MODEL_ID` | Fast/cheap model for atom extraction |
+| `SYNTHESIS_MODEL_ID` | Stronger model for final Markdown guide |
+| `EMBEDDING_MODEL_ID` | Embeddings for clustering (default Titan v2) |
+| `NUM_CANDIDATES` / `TARGET_VIDEOS` / `FORCE_DEEPGRAM_TOP_N` | Search + selection policy |
+| `TRANSCRIPT_LANGUAGES` | Caption language priority (e.g. `en` or `en,hi`) |
+| `DEEPGRAM_API_KEY` / `DEEPGRAM_MODEL` | Paid STT for top caption-less videos |
+| `DEDUPE_SIMILARITY_THRESHOLD` | Clustering similarity cutoff |
+| `ENABLE_WHISPER_FALLBACK` + `WHISPER_*` | Optional local STT |
+| `DB_PATH` | SQLite path (default `plan4me.db`) |
+| `NEXT_PUBLIC_API_BASE` | Frontend → API base (default `http://localhost:8000`) |
+
+`.env.local` overrides `.env` when present.
+
+## Project structure
+
+```
+plan4me/
+├── backend/           # FastAPI app, ingestion, LLM, LangGraph pipeline, SQLite
+├── frontend/          # Next.js UI
+├── mcp_server/        # stdio MCP tools for agents
+├── scripts/           # smoke_test, Deepgram probe, model probes, MCP setup
+├── docs/              # MCP & skills guide
+├── .cursor/           # MCP example, video-research skill, video-researcher agent
+├── .env.example
+├── requirements.txt
+└── requirements-whisper.txt
+```
+
+## Development scripts
+
+| Command | What it does |
+|---------|----------------|
+| `uvicorn backend.api.main:app --reload --port 8000` | API + pipeline |
+| `cd frontend && npm run dev` | Next.js dev server |
+| `cd frontend && npm run build` / `npm run lint` | Production build / lint |
+| `python -m mcp_server` | Run MCP server (stdio; usually launched by Cursor) |
+| `python -m scripts.smoke_test` | Cheap layer checks |
+| `python -m scripts.smoke_test --full` | + Bedrock layers |
+| `./scripts/setup_mcp.sh` or `.\scripts\setup_mcp.ps1` | Generate local `.cursor/mcp.json` |
+| `python scripts/test_deepgram.py` | Deepgram path check |
+| `python scripts/probe_models.py` | Bedrock model probe |
+
+## Cursor MCP & skills
+
+plan4me ships a **plan4me** MCP server and a **video-research** skill so agents can run the same pipeline from chat.
+
+```powershell
+# Windows — from repo root, after creating .venv
+.\scripts\setup_mcp.ps1
+```
+
+```bash
+# macOS / Linux
+./scripts/setup_mcp.sh
+```
+
+Then reload MCP in Cursor and call `health`.
+
+Full setup, tools, and troubleshooting: **[docs/MCP_AND_SKILLS.md](docs/MCP_AND_SKILLS.md)**
+
+- Skill: [`.cursor/skills/video-research/SKILL.md`](.cursor/skills/video-research/SKILL.md)
+- Agent: [`.cursor/agents/video-researcher.md`](.cursor/agents/video-researcher.md)
+
+## Contributing
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for fork/clone, branches, commits, PRs, and local testing.
+
+## License
+
+[MIT](LICENSE) © Affan Shaikhsurab

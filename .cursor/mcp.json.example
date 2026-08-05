@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "plan4me": {
+      "command": "REPLACE_WITH_VENV_PYTHON",
+      "args": ["-m", "mcp_server"],
+      "cwd": "REPLACE_WITH_REPO_ROOT",
+      "env": {
+        "PYTHONPATH": "REPLACE_WITH_REPO_ROOT"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+# Issue template chooser
+blank_issues_enabled: true
+contact_links:
+  - name: MCP & skills setup
+    url: https://github.com/AffanShaikhsurab/plan4me/blob/master/docs/MCP_AND_SKILLS.md
+    about: How to connect the plan4me MCP server and use Cursor skills

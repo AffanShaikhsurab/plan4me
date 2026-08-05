@@ -13,7 +13,14 @@ audio_cache/
 node_modules/
 frontend/node_modules/
 frontend/.next/
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
 .next/
 .DS_Store
 *.egg-info/
 .vscode/
+.idea/
+
+# Machine-specific Cursor MCP paths (use mcp.json.example + scripts/setup_mcp.*)
+.cursor/mcp.json
+

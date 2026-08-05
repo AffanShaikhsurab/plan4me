@@ -1,5 +1,9 @@
 # plan4me
 
+<p align="center">
+  <img src="docs/assets/plan4me-banner.png" alt="plan4me — collective knowledge from video" width="100%" />
+</p>
+
 Turn hours of YouTube interviews, talks, and podcasts into one **evidence-backed knowledge guide**.
 
 plan4me searches YouTube for a topic, pulls transcripts (captions, optional Deepgram/Whisper), extracts cited “knowledge atoms” with Amazon Bedrock, clusters overlapping claims, and synthesizes a Markdown report you can read in the web UI—or hand to a coding agent via MCP.

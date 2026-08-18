@@ -33,13 +33,15 @@ def register_embedding(cls: type[E]) -> type[E]:
 
 
 def _register(target: dict, name: str, cls: type, kind: str) -> None:
-    # A bare `name: ClassVar[str]` annotation defines no attribute, so getattr
-    # with a default is what turns "forgot to set name" into a clear error.
+    # Normalised first, so validation sees what lookup will see. Registering
+    # under the same normalisation means a provider cannot be listed as
+    # available yet be unresolvable, and a whitespace-only name is rejected
+    # rather than claiming the empty key.
+    # (A bare `name: ClassVar[str]` annotation defines no attribute, hence the
+    # getattr default at the call sites.)
+    name = (name or "").strip().lower()
     if not name:
         raise ProviderError(f"{cls.__name__} must define a non-empty `name`.")
-    # Registered under the same normalisation that lookup uses, so a provider
-    # cannot be listed as available yet be unresolvable.
-    name = name.strip().lower()
     existing = target.get(name)
     if existing is not None and existing is not cls:
         raise ProviderError(

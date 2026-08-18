@@ -3,7 +3,7 @@
 Run:  python -m scripts.smoke_test  [--topic "..."]  [--videos N]  [--full]
 
 By default it runs the cheap layers (imports, search, captions). Add --full to
-also exercise Bedrock (extraction + synthesis), which incurs token cost.
+also exercise the LLM layers (extraction + synthesis), which cost tokens.
 """
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def test_captions(vids):
         return None
 
 
-def test_bedrock():
+def test_llm():
     """Reachability of whichever provider LLM_PROVIDER selects."""
     try:
         from backend.llm.chat import active_models, get_extraction_llm
@@ -127,7 +127,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--topic", default="how to get a remote software job")
     ap.add_argument("--videos", type=int, default=8)
-    ap.add_argument("--full", action="store_true", help="also run Bedrock layers")
+    ap.add_argument("--full", action="store_true", help="also run the LLM layers")
     args = ap.parse_args()
 
     print(f"\n=== plan4me smoke test | topic={args.topic!r} ===\n")
@@ -139,11 +139,11 @@ def main() -> int:
     transcript = test_captions(vids)
 
     if args.full:
-        if test_bedrock():
+        if test_llm():
             atoms = test_extraction(args.topic, transcript)
             test_cluster_and_synth(args.topic, atoms)
     else:
-        print("\n(Skipping Bedrock layers. Re-run with --full to test extraction/synthesis.)")
+        print("\n(Skipping LLM layers. Re-run with --full to test extraction/synthesis.)")
 
     print("\n=== done ===")
     return 0

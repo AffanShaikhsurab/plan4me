@@ -121,12 +121,21 @@ def client():
     return TestClient(app)
 
 
-def test_health_reports_both_providers(client):
+def test_health_reports_both_providers(client, settings_factory, monkeypatch):
+    """Pins the providers so the assertion cannot depend on ambient config."""
+    import backend.api.main as main
+
+    pinned = settings_factory(llm_provider="bedrock", embedding_provider="local")
+    monkeypatch.setattr(main, "get_settings", lambda: pinned)
+    monkeypatch.setattr(facade, "get_settings", lambda: pinned)
+    facade.reset_provider_cache()
+
     body = client.get("/health").json()
     assert body["status"] == "ok"
     # The frontend's HealthInfo shape must stay intact.
     assert {"region", "extraction_model", "synthesis_model", "whisper_fallback"} <= body.keys()
-    assert {"llm_provider", "embedding_provider"} <= body.keys()
+    assert body["llm_provider"] == "bedrock"
+    assert body["embedding_provider"] == "local"
 
 
 def test_health_embeddings_returns_real_dimensions(client, monkeypatch):
@@ -202,4 +211,27 @@ def test_health_llm_returns_503_not_500_on_unknown_provider(client, monkeypatch)
     resp = client.get("/health/llm")
     assert resp.status_code == 503
     assert "not supported" in resp.json()["detail"]
+
+
+def test_degraded_health_payload_matches_the_frontend_contract(client, monkeypatch):
+    """The degraded branch sends nulls, which HealthInfo must permit.
+
+    frontend/app/api.ts types extraction_model/synthesis_model as
+    `string | null` and llm_error as optional precisely because of this shape.
+    """
+    import backend.api.main as main
+
+    settings = facade.get_settings()
+    bad = settings.model_copy(update={"llm_provider": "totally_bogus"})
+    monkeypatch.setattr(main, "get_settings", lambda: bad)
+    monkeypatch.setattr(facade, "get_settings", lambda: bad)
+    facade.reset_provider_cache()
+
+    body = client.get("/health").json()
+    assert body["extraction_model"] is None
+    assert body["synthesis_model"] is None
+    assert isinstance(body["llm_error"], str)
+    # Every key the frontend reads must still be present.
+    assert {"status", "region", "whisper_fallback", "llm_provider",
+            "embedding_provider"} <= body.keys()
 

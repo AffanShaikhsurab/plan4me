@@ -15,7 +15,7 @@ This project exposes the research pipeline to agents through a **stdio MCP serve
 
 | Tool | Cost / duration | Use |
 |------|-----------------|-----|
-| `health` | Cheap LLM provider ping | Verify AWS/models before a long run |
+| `health` | Cheap LLM provider ping | Verify the active provider's credentials and model access before a long run |
 | `search_videos` | Cheap (yt-dlp only) | Preview YouTube candidates |
 | `research_topic` | **Long** (minutes) + LLM ± Deepgram | Full pipeline → cited Markdown |
 | `get_latest_report` | Free (SQLite) | Recover last saved report |
@@ -160,7 +160,7 @@ Phrase `topic` like a search for expert talks (e.g. `"B2B SaaS pricing interview
 |---------|----------------|
 | MCP won’t start | Venv Python path in `mcp.json`; `pip install -r requirements.txt`; run `setup_mcp` again |
 | Import errors for `backend` | `PYTHONPATH` and `cwd` both set to repo root |
-| `llm: "error"` in `health` (see `llm_error`) | AWS credentials, region, model IDs enabled in Bedrock |
+| `llm: "error"` in `health` (see `llm_error`) | The credential for `LLM_PROVIDER`: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `MOONSHOT_API_KEY`; for `ollama` a reachable `OLLAMA_BASE_URL`; for `bedrock` AWS credentials, region, and model access. Check the model name too — `EXTRACTION_MODEL` / `SYNTHESIS_MODEL`, or `EXTRACTION_MODEL_ID` on Bedrock |
 | Empty / blocked transcripts | Captions availability; Deepgram key; network / YouTube rate limits |
 | Long hang on `research_topic` | Expected for full runs; use `get_latest_report` before retrying |
 | Wrong DB file | Server `chdir`s to repo root; `DB_PATH` is relative to that |

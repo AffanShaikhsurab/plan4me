@@ -109,3 +109,33 @@ def test_role_parameters_differ_between_extraction_and_synthesis(settings):
     assert extraction.temperature == 0.0
     assert synthesis.temperature > extraction.temperature
     assert synthesis.max_tokens > extraction.max_tokens
+
+
+def test_whitespace_only_provider_name_is_rejected():
+    """Regression: `"   "` passed the emptiness check, then normalised to `""`.
+
+    That claimed the empty key, so `create_chat("")` selected it.
+    """
+    from backend.llm.providers.registry import _CHAT, register_chat
+
+    class _Blank(ChatProvider):
+        name = "   "
+        default_extraction_model = "x"
+        default_synthesis_model = "x"
+
+        def _build(self, spec):  # pragma: no cover - never built
+            raise AssertionError
+
+    try:
+        with pytest.raises(ProviderError, match="non-empty"):
+            register_chat(_Blank)
+        assert "" not in _CHAT
+    finally:
+        _CHAT.pop("", None)
+
+
+def test_empty_provider_name_never_resolves(settings):
+    with pytest.raises(ProviderError):
+        create_chat("", settings)
+    with pytest.raises(ProviderError):
+        create_chat("   ", settings)

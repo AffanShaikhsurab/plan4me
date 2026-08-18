@@ -95,6 +95,10 @@ def health() -> dict[str, Any]:
 
         result["embeddings"] = describe_embeddings()
     except Exception as exc:  # noqa: BLE001
+        # Clustering cannot run without embeddings, so this is not cosmetic:
+        # leaving status "ok" would let an agent start a long research_topic
+        # run after a preflight that already knows it will fail.
+        result["status"] = "degraded"
         result["embeddings"] = {"error": str(exc)[:200]}
 
     try:

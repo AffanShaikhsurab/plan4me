@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from backend.config import Settings  # noqa: E402
+from backend.config import Settings, get_settings  # noqa: E402
 from backend.llm import chat as chat_facade  # noqa: E402
 from backend.llm import embeddings as embedding_facade  # noqa: E402
 
@@ -52,10 +52,31 @@ def settings(settings_factory) -> Settings:
     return settings_factory()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _disable_dotenv_for_the_session():
+    """Stop every Settings construction from reading the repo `.env`.
+
+    `settings_factory` passes `_env_file=None`, but code paths that call
+    `get_settings()` directly - the FastAPI app, the facades - build Settings
+    themselves and would otherwise pick up the developer's file.
+    """
+    original = Settings.model_config.get("env_file")
+    Settings.model_config["env_file"] = None
+    yield
+    Settings.model_config["env_file"] = original
+
+
 @pytest.fixture(autouse=True)
 def _clear_provider_caches():
+    """Clear the Settings singleton too, not just the providers.
+
+    `get_settings` is `lru_cache`d, so resetting only the provider caches would
+    hand the rebuilt provider the same stale Settings.
+    """
+    get_settings.cache_clear()
     chat_facade.reset_provider_cache()
     embedding_facade.reset_provider_cache()
     yield
+    get_settings.cache_clear()
     chat_facade.reset_provider_cache()
     embedding_facade.reset_provider_cache()

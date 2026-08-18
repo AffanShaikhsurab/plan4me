@@ -15,9 +15,9 @@ This project exposes the research pipeline to agents through a **stdio MCP serve
 
 | Tool | Cost / duration | Use |
 |------|-----------------|-----|
-| `health` | Cheap Bedrock ping | Verify AWS/models before a long run |
+| `health` | Cheap LLM provider ping | Verify AWS/models before a long run |
 | `search_videos` | Cheap (yt-dlp only) | Preview YouTube candidates |
-| `research_topic` | **Long** (minutes) + Bedrock ± Deepgram | Full pipeline → cited Markdown |
+| `research_topic` | **Long** (minutes) + LLM ± Deepgram | Full pipeline → cited Markdown |
 | `get_latest_report` | Free (SQLite) | Recover last saved report |
 
 Typical agent flow: clarify topic → optional `health` → `search_videos` → `research_topic` → present Markdown (or `get_latest_report` if interrupted).
@@ -44,7 +44,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env -ErrorAction SilentlyContinue
-# Edit .env — AWS region/models, optional DEEPGRAM_API_KEY
+# Edit .env — LLM_PROVIDER and its credential, optional DEEPGRAM_API_KEY
 ```
 
 ### 2. Generate local MCP config
@@ -68,7 +68,7 @@ This writes `.cursor/mcp.json` with the correct absolute paths for your clone an
 
 1. Ensure `.env` (or `.env.local`) exists at the repo root — the MCP process loads both.
 2. Cursor Settings → MCP → restart **plan4me** (or reopen the project).
-3. In chat, ask an agent to call `health`. Expect `"bedrock": "ok"` when credentials and model IDs are valid.
+3. In chat, ask an agent to call `health`. Expect `"llm": "ok"` when credentials and model IDs are valid.
 
 ### Manual check (stdio)
 
@@ -147,7 +147,7 @@ Use it (or Task subagents) when fanning out **multi-angle** topics: one `researc
 
 ## Manual tool smoke (from an agent)
 
-1. `health` — settings + Bedrock check
+1. `health` — settings + LLM provider check
 2. `search_videos` with `query` and `max_results` 10–15
 3. `research_topic` with a concrete YouTube-style query and modest `max_videos` (e.g. 5 while testing)
 4. `get_latest_report` if the run was interrupted or you need the last saved Markdown
@@ -160,7 +160,7 @@ Phrase `topic` like a search for expert talks (e.g. `"B2B SaaS pricing interview
 |---------|----------------|
 | MCP won’t start | Venv Python path in `mcp.json`; `pip install -r requirements.txt`; run `setup_mcp` again |
 | Import errors for `backend` | `PYTHONPATH` and `cwd` both set to repo root |
-| `bedrock: error` in `health` | AWS credentials, region, model IDs enabled in Bedrock |
+| `llm: "error"` in `health` (see `llm_error`) | AWS credentials, region, model IDs enabled in Bedrock |
 | Empty / blocked transcripts | Captions availability; Deepgram key; network / YouTube rate limits |
 | Long hang on `research_topic` | Expected for full runs; use `get_latest_report` before retrying |
 | Wrong DB file | Server `chdir`s to repo root; `DB_PATH` is relative to that |

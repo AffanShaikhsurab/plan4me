@@ -1,7 +1,7 @@
 """stdio MCP server wrapping the plan4me YouTube research pipeline.
 
 Tools:
-    health              - settings / Bedrock reachability summary
+    health              - settings / active LLM provider reachability summary
     search_videos       - yt-dlp search only (cheap preview)
     research_topic      - full pipeline (long-running): search → transcripts →
                           extract → cluster → synthesize Markdown report
@@ -58,36 +58,56 @@ mcp = MCPServer("plan4me")
 
 @mcp.tool()
 def health() -> dict[str, Any]:
-    """Return plan4me settings summary and a cheap Bedrock reachability check.
+    """Return plan4me settings and a cheap reachability check of the active LLM.
 
-    Use before a long research_topic call to confirm AWS/Bedrock credentials
-    and model access are configured.
+    Use before a long research_topic call to confirm the configured provider's
+    credentials and model access. Which provider runs is set by LLM_PROVIDER.
     """
     s = get_settings()
+    # Seeded from the raw setting so these keys exist even if provider
+    # resolution itself fails (e.g. an unknown LLM_PROVIDER value).
     result: dict[str, Any] = {
         "status": "ok",
-        "region": s.aws_region,
-        "extraction_model": s.extraction_model_id,
-        "synthesis_model": s.synthesis_model_id,
-        "embedding_model": s.embedding_model_id,
+        "llm": "unchecked",
+        "llm_provider": s.llm_provider,
+        "embedding_provider": s.embedding_provider,
         "target_videos": s.target_videos,
         "num_candidates": s.num_candidates,
         "deepgram_enabled": s.deepgram_enabled,
         "whisper_fallback": s.enable_whisper_fallback,
         "db_path": str((_REPO_ROOT / s.db_path).resolve()),
-        "bedrock": "unchecked",
     }
+
+    # Resolved model names come from the provider, not from the Bedrock-only
+    # settings, so they stay truthful on every provider.
     try:
-        from backend.llm.bedrock import get_extraction_llm
+        from backend.llm.chat import active_models
+
+        result.update(active_models())
+    except Exception as exc:  # noqa: BLE001
+        result["status"] = "degraded"
+        result["llm"] = "error"
+        result["llm_error"] = str(exc)[:300]
+        return result
+
+    try:
+        from backend.llm.embeddings import describe as describe_embeddings
+
+        result["embeddings"] = describe_embeddings()
+    except Exception as exc:  # noqa: BLE001
+        result["embeddings"] = {"error": str(exc)[:200]}
+
+    try:
+        from backend.llm.chat import get_extraction_llm
 
         resp = get_extraction_llm().invoke("Reply with the single word: ok")
         text = resp.content if isinstance(resp.content, str) else str(resp.content)
-        result["bedrock"] = "ok"
-        result["bedrock_reply"] = text.strip()[:50]
+        result["llm"] = "ok"
+        result["llm_reply"] = text.strip()[:50]
     except Exception as exc:  # noqa: BLE001
         result["status"] = "degraded"
-        result["bedrock"] = "error"
-        result["bedrock_error"] = str(exc)[:300]
+        result["llm"] = "error"
+        result["llm_error"] = str(exc)[:300]
     return result
 
 
@@ -114,8 +134,9 @@ def research_topic(
     """Run the full plan4me video research pipeline for a topic.
 
     LONG-RUNNING (often several minutes): searches YouTube, fetches transcripts
-    (captions / Deepgram / optional Whisper), extracts knowledge atoms via
-    Bedrock, clusters them, and synthesizes a cited Markdown knowledge guide.
+    (captions, or Deepgram when enabled), extracts knowledge atoms with the
+    configured LLM provider, clusters them, and synthesizes a cited Markdown
+    knowledge guide.
 
     Args:
         topic: Research topic or search query (e.g. "B2B SaaS pricing interviews").

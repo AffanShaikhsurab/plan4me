@@ -72,14 +72,17 @@ def test_captions(vids):
 
 
 def test_bedrock():
-    print("4) Bedrock reachability (langchain-aws ChatBedrockConverse)")
+    """Reachability of whichever provider LLM_PROVIDER selects."""
     try:
-        from backend.llm.bedrock import get_extraction_llm
+        from backend.llm.chat import active_models, get_extraction_llm
+        models = active_models()
+        print(f"4) LLM reachability (provider={models['provider']}, "
+              f"model={models['extraction_model']})")
         resp = get_extraction_llm().invoke("Reply with the single word: ok")
         _ok(f"model replied: {str(resp.content)[:40]!r}")
         return True
     except Exception as exc:  # noqa: BLE001
-        _fail("bedrock error", exc)
+        _fail("llm error", exc)
         return False
 
 

@@ -1,0 +1,11 @@
+# Optional chat providers. Install only the ones you plan to use.
+# Selected via LLM_PROVIDER; see .env.example.
+
+# LLM_PROVIDER=anthropic
+langchain-anthropic>=1.1.0
+
+# LLM_PROVIDER=gemini
+langchain-google-genai>=2.0.0
+
+# LLM_PROVIDER=ollama  (local models, no API key)
+langchain-ollama>=0.2.0

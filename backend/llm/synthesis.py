@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from backend.llm.bedrock import get_synthesis_llm
+from backend.llm.chat import get_synthesis_llm
 from backend.schemas import AtomCluster
 
 logger = logging.getLogger(__name__)

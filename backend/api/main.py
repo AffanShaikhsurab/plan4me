@@ -2,7 +2,8 @@
 
 Endpoints:
     GET  /health                 - liveness
-    GET  /health/bedrock         - verify Bedrock reachability (cheap call)
+    GET  /health/llm             - verify the active chat provider (cheap call)
+    GET  /health/bedrock         - alias of /health/llm (kept for older docs)
     POST /search                 - yt-dlp search only (no LLM, cheap sanity check)
     POST /report                 - run the full pipeline for a topic (blocking)
     POST /research               - start the pipeline as a job and return its id
@@ -17,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.config import get_settings
+from backend.llm.chat import active_models
 from backend.ingestion.search import search_videos
 from backend.pipeline.graph import run_pipeline
 from backend.pipeline.jobs import get_job, start_job
@@ -60,26 +62,77 @@ def _startup() -> None:
 
 @app.get("/health")
 def health() -> dict:
+    """Liveness. Reports misconfiguration as data rather than failing.
+
+    An unknown LLM_PROVIDER must not take down the liveness probe, so provider
+    resolution is allowed to fail here and is surfaced in `status`/`llm_error`.
+    """
     s = get_settings()
+    try:
+        models = active_models()
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "degraded",
+            "region": s.aws_region,
+            "extraction_model": None,
+            "synthesis_model": None,
+            "whisper_fallback": s.enable_whisper_fallback,
+            "llm_provider": s.llm_provider,
+            "embedding_provider": s.embedding_provider,
+            "llm_error": str(exc)[:300],
+        }
     return {
         "status": "ok",
+        # Kept flat for the existing frontend HealthInfo shape.
         "region": s.aws_region,
-        "extraction_model": s.extraction_model_id,
-        "synthesis_model": s.synthesis_model_id,
+        "extraction_model": models["extraction_model"],
+        "synthesis_model": models["synthesis_model"],
         "whisper_fallback": s.enable_whisper_fallback,
+        "llm_provider": models["provider"],
+        "embedding_provider": s.embedding_provider,
     }
+
+
+@app.get("/health/llm")
+def health_llm() -> dict:
+    """Make a tiny chat call to confirm credentials + model access."""
+    s = get_settings()
+    # Provider resolution is inside the try: an unknown LLM_PROVIDER is a
+    # configuration problem, which is a 503, not an unhandled 500.
+    try:
+        from backend.llm.chat import get_extraction_llm
+
+        models = active_models()
+        resp = get_extraction_llm().invoke("Reply with the single word: ok")
+        text = resp.content if isinstance(resp.content, str) else str(resp.content)
+        return {"status": "ok", **models, "model_reply": text.strip()[:50]}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=503,
+            detail=f"{s.llm_provider} unreachable: {exc}",
+        )
 
 
 @app.get("/health/bedrock")
 def health_bedrock() -> dict:
-    """Make a tiny Bedrock call to confirm credentials + model access."""
-    from backend.llm.bedrock import get_extraction_llm
+    """Back-compat alias; the provider is whatever LLM_PROVIDER selects."""
+    return health_llm()
+
+
+@app.get("/health/embeddings")
+def health_embeddings() -> dict:
+    """Confirm the embedding provider returns a usable vector."""
+    from backend.llm.embeddings import describe, embed_text
+
+    s = get_settings()
     try:
-        resp = get_extraction_llm().invoke("Reply with the single word: ok")
-        text = resp.content if isinstance(resp.content, str) else str(resp.content)
-        return {"status": "ok", "model_reply": text.strip()[:50]}
+        vec = embed_text("healthcheck")
+        return {"status": "ok", **describe(), "dims": len(vec)}
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=503, detail=f"bedrock unreachable: {exc}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"embeddings ({s.embedding_provider}) unreachable: {exc}",
+        )
 
 
 class SearchRequest(BaseModel):

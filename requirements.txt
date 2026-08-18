@@ -13,6 +13,10 @@ langchain>=0.3.27
 langgraph>=0.2.60
 langchain-aws>=0.2.10
 boto3>=1.35
+# OpenAI-compatible chat providers (openai, moonshot) + OpenAI embeddings.
+langchain-openai>=0.3.0
+openai>=1.60
+# Other providers are optional: pip install -r requirements-providers.txt
 numpy>=1.26
 
 # Ingestion

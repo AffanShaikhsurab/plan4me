@@ -1,0 +1,5 @@
+# Test tooling.  Run: pytest tests -q
+-r requirements.txt
+-r requirements-providers.txt
+pytest>=8.0
+httpx>=0.27          # fastapi.testclient

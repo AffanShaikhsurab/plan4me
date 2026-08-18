@@ -45,6 +45,10 @@ export interface HealthInfo {
   extraction_model: string;
   synthesis_model: string;
   whisper_fallback: boolean;
+  /** Active chat provider: bedrock | openai | anthropic | gemini | ollama | moonshot. */
+  llm_provider: string;
+  /** Active embedding provider: bedrock | openai | local. */
+  embedding_provider: string;
 }
 
 export type ResearchStage =

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from backend.llm.bedrock import get_extraction_llm
+from backend.llm.chat import get_extraction_llm, structured
 from backend.schemas import (
     AtomExtraction,
     KnowledgeAtom,
@@ -56,7 +56,7 @@ def _chunk_transcript(transcript: Transcript, max_chars: int = 6000) -> list[tup
 def extract_atoms(topic: str, transcript: Transcript) -> list[KnowledgeAtom]:
     """Extract knowledge atoms from a single transcript."""
     llm = get_extraction_llm()
-    structured = llm.with_structured_output(AtomExtraction)
+    model = structured(llm, AtomExtraction)
 
     atoms: list[KnowledgeAtom] = []
     for chunk_start, text in _chunk_transcript(transcript):
@@ -67,12 +67,20 @@ def extract_atoms(topic: str, transcript: Transcript) -> list[KnowledgeAtom]:
             f"TRANSCRIPT EXCERPT:\n{text}"
         )
         try:
-            result: AtomExtraction = structured.invoke(
+            result: AtomExtraction = model.invoke(
                 [("system", _SYSTEM), ("human", prompt)]
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("extraction failed for %s @ %.0fs: %s",
                            transcript.video_id, chunk_start, exc)
+            continue
+
+        # with_structured_output yields None when the model returns no parseable
+        # tool call, which local/weaker models do. Skipping the chunk keeps the
+        # atoms already extracted from a paid-for transcription run.
+        if result is None:
+            logger.warning("extraction returned no structured output for %s @ %.0fs",
+                           transcript.video_id, chunk_start)
             continue
 
         for raw in result.atoms:

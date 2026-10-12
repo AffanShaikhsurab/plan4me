@@ -40,11 +40,19 @@ export interface KnowledgeReport {
 }
 
 export interface HealthInfo {
+  /** "ok", or "degraded" when the provider could not be resolved. */
   status: string;
   region: string;
-  extraction_model: string;
-  synthesis_model: string;
+  /** null when status is "degraded" — the provider never resolved. */
+  extraction_model: string | null;
+  synthesis_model: string | null;
   whisper_fallback: boolean;
+  /** Active chat provider: bedrock | openai | anthropic | gemini | ollama | moonshot. */
+  llm_provider: string;
+  /** Active embedding provider: bedrock | openai | local. */
+  embedding_provider: string;
+  /** Present only when status is "degraded". */
+  llm_error?: string;
 }
 
 export type ResearchStage =

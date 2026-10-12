@@ -11,8 +11,7 @@ import logging
 
 import numpy as np
 
-from backend.config import get_settings
-from backend.llm.embeddings import embed_texts
+from backend.llm.embeddings import embed_texts, similarity_threshold
 from backend.schemas import AtomCluster, KnowledgeAtom
 
 logger = logging.getLogger(__name__)
@@ -29,8 +28,7 @@ def cluster_atoms(atoms: list[KnowledgeAtom]) -> list[AtomCluster]:
     if not atoms:
         return []
 
-    settings = get_settings()
-    threshold = settings.dedupe_similarity_threshold
+    threshold = similarity_threshold()
 
     # Embed the claim text of each atom.
     texts = [a.claim for a in atoms]

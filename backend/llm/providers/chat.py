@@ -77,11 +77,18 @@ class BedrockChatProvider(ChatProvider):
 
     def _build(self, spec: ModelSpec) -> Any:
         cls = self._import("langchain_aws", "ChatBedrockConverse", "langchain-aws")
+        # Botocore's default read timeout is 60s. A full guide (synthesis,
+        # 8192 tokens) or a structured extraction chunk often takes longer,
+        # and the socket then dies as SSLError: "The operation did not
+        # complete (read)".
+        read_timeout = 300 if spec.max_tokens > 4096 else 180
         return cls(
             model=spec.model,
             region_name=self._settings.aws_region,
             temperature=spec.temperature,
             disable_streaming=spec.model.startswith(self._NON_STREAMING_PREFIXES),
+            timeout=read_timeout,
+            max_retries=2,
             **self._token_kwargs(spec),
         )
 

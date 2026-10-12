@@ -200,6 +200,12 @@ def test_bedrock_disables_streaming_only_for_providers_that_lack_it(
     ).extraction_llm()
     assert unsupported.disable_streaming is True
     assert supported.disable_streaming is False
+    # Extraction stays under the long-report budget; synthesis needs more.
+    assert unsupported.timeout == 180
+    synthesis = create_chat(
+        "bedrock", settings_factory(synthesis_model_id="deepseek.v3.2")
+    ).synthesis_llm()
+    assert synthesis.timeout == 300
 
 
 # --- structured output -----------------------------------------------------

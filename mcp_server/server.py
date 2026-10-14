@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -42,6 +43,7 @@ from mcp.server import MCPServer  # noqa: E402
 from backend.config import get_settings  # noqa: E402
 from backend.ingestion.search import search_videos as yt_search  # noqa: E402
 from backend.pipeline.graph import run_pipeline  # noqa: E402
+from backend.research.pipeline import run_research  # noqa: E402
 from backend.schemas import KnowledgeReport, cluster_to_insight  # noqa: E402
 from backend.storage.store import (  # noqa: E402
     get_latest_report as store_latest,
@@ -135,27 +137,25 @@ def research_topic(
     max_videos: int = 10,
     languages: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Run the full plan4me video research pipeline for a topic.
+    """Run the plan4me research pipeline for a topic.
 
-    LONG-RUNNING (often several minutes): searches YouTube, fetches transcripts
-    (captions, or Deepgram when enabled), extracts knowledge atoms with the
-    configured LLM provider, clusters them, and synthesizes a cited Markdown
-    knowledge guide.
+    LONG-RUNNING. The default pipeline writes a caption brief per video, merges
+    the briefs into one agenda, and researches only the concepts that appear in
+    two or more videos. Set LEGACY_ATOM_PIPELINE=true to run the older
+    search, transcribe, extract, cluster, and synthesize path.
 
     Args:
-        topic: Research topic or search query (e.g. "B2B SaaS pricing interviews").
-        max_videos: How many videos to process (1–50). Higher = slower and costlier.
+        topic: Research topic or search query (e.g. "how to build in public").
+        max_videos: How many videos to process (1–50). Above 50 returns an error.
         languages: Optional comma-separated transcript language codes (e.g. "en,hi").
                    Defaults to TRANSCRIPT_LANGUAGES from env.
-
-    Returns markdown report plus counts (videos, transcripts, atoms, clusters).
-    Prefer search_videos first to validate the query, then call this once.
     """
     topic = topic.strip()
     if not topic:
         return {"error": "topic is required"}
+    if isinstance(max_videos, bool) or not isinstance(max_videos, int) or not 1 <= max_videos <= 50:
+        return {"error": "max_videos must be 1 to 50"}
 
-    max_videos = max(1, min(max_videos, 50))
     lang_list: list[str] | None = None
     if languages and languages.strip():
         lang_list = [c.strip() for c in languages.split(",") if c.strip()]
@@ -163,6 +163,23 @@ def research_topic(
     init_db()
     logger.info("research_topic start topic=%r max_videos=%s", topic, max_videos)
 
+    if get_settings().legacy_atom_pipeline:
+        return _legacy_research(topic, max_videos, lang_list)
+
+    result = run_research(topic, max_videos, lang_list)
+    logger.info(
+        "research_topic done topic=%r transcripts=%s concepts=%s deep=%s",
+        topic,
+        result.transcripts_found,
+        result.clusters,
+        result.concepts_deep_researched,
+    )
+    return result.model_dump()
+
+
+def _legacy_research(
+    topic: str, max_videos: int, lang_list: list[str] | None
+) -> dict[str, Any]:
     state = run_pipeline(topic, max_videos, lang_list)
 
     atoms = state.get("atoms", [])
@@ -179,6 +196,7 @@ def research_topic(
         clusters=len(clusters),
         markdown=state.get("report_markdown", ""),
         insights=insights,
+        job_id=uuid.uuid4().hex[:12],
     )
     save_report(result)
 
@@ -196,6 +214,7 @@ def research_topic(
         "transcripts_found": result.transcripts_found,
         "atoms_extracted": result.atoms_extracted,
         "clusters": result.clusters,
+        "job_id": result.job_id,
         "markdown": result.markdown,
         "insights": [i.model_dump() for i in insights[:20]],
     }
@@ -220,6 +239,10 @@ def get_latest_report() -> dict[str, Any]:
         "transcripts_found": meta.get("transcripts_found", 0),
         "atoms_extracted": meta.get("atoms_extracted", 0),
         "clusters": meta.get("clusters", 0),
+        "candidates_searched": meta.get("candidates_searched", 0),
+        "videos_skipped": meta.get("videos_skipped", 0),
+        "concepts_deep_researched": meta.get("concepts_deep_researched", 0),
+        "job_id": meta.get("job_id", ""),
         "markdown": row["markdown"],
         "created_at": row.get("created_at"),
     }

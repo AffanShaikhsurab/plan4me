@@ -87,6 +87,14 @@ class Settings(BaseSettings):
     # --- Storage ---
     db_path: str = "plan4me.db"
 
+    # --- Research pipeline ---
+    # True keeps the caption-atom graph. Default is the two-depth pipeline.
+    legacy_atom_pipeline: bool = False
+    web_search_provider: str = "duckduckgo"
+    tavily_api_key: str = ""
+    # Product cap is 12 even if the environment asks for more.
+    deep_max_concepts: int = 12
+
     @property
     def transcript_language_list(self) -> list[str]:
         return [c.strip() for c in self.transcript_languages.split(",") if c.strip()]
@@ -94,6 +102,11 @@ class Settings(BaseSettings):
     @property
     def deepgram_enabled(self) -> bool:
         return bool(self.deepgram_api_key.strip())
+
+    @property
+    def deep_concept_cap(self) -> int:
+        """How many multi-source concepts the deep pass may open. Always 1–12."""
+        return max(1, min(int(self.deep_max_concepts), 12))
 
 
 @lru_cache

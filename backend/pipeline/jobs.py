@@ -16,14 +16,24 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Optional
 
+from backend.config import get_settings
 from backend.pipeline.graph import stream_pipeline
+from backend.research.pipeline import stream_research
 from backend.schemas import AtomCluster, KnowledgeAtom, KnowledgeReport, cluster_to_insight
 from backend.storage.store import save_atoms, save_report
 
 logger = logging.getLogger(__name__)
 
-# Stage order the UI can rely on, matching the LangGraph node names.
-STAGE_ORDER = ("search", "transcribe", "extract", "cluster", "synthesize")
+# Stage order the UI can rely on. Legacy mode still runs the atom graph,
+# but new jobs report these names.
+STAGE_ORDER = (
+    "search",
+    "transcribe",
+    "video_briefs",
+    "merge_agenda",
+    "deep_research",
+    "final_doc",
+)
 
 # Jobs are kept only long enough for a client to read the result.
 _MAX_JOBS = 12
@@ -81,6 +91,45 @@ def _prune_locked() -> None:
 
 
 def _run(job: ResearchJob, languages: Optional[list[str]]) -> None:
+    if get_settings().legacy_atom_pipeline:
+        _run_legacy(job, languages)
+        return
+    _run_research_job(job, languages)
+
+
+def _run_research_job(job: ResearchJob, languages: Optional[list[str]]) -> None:
+    report: Optional[KnowledgeReport] = None
+    try:
+        for stage, counts in stream_research(
+            job.topic, job.max_videos, languages, job.job_id
+        ):
+            found = counts.get("report")
+            if isinstance(found, KnowledgeReport):
+                report = found
+            with _lock:
+                if stage not in job.completed_stages:
+                    job.completed_stages.append(stage)
+                job.stage = _next_stage(job.completed_stages)
+                job.counts = {
+                    key: value for key, value in counts.items() if isinstance(value, int)
+                }
+        if report is None:
+            raise RuntimeError("research produced no report")
+        with _lock:
+            job.report = report
+            job.status = "done"
+            job.stage = "done"
+            job.completed_stages = list(STAGE_ORDER)
+            job.finished_at = time.time()
+    except Exception as exc:  # noqa: BLE001 - any pipeline failure belongs to the client
+        logger.exception("research job %s failed", job.job_id)
+        with _lock:
+            job.status = "error"
+            job.error = str(exc)[:400]
+            job.finished_at = time.time()
+
+
+def _run_legacy(job: ResearchJob, languages: Optional[list[str]]) -> None:
     videos = transcripts = 0
     atoms: list[KnowledgeAtom] = []
     clusters: list[AtomCluster] = []
@@ -121,6 +170,7 @@ def _run(job: ResearchJob, languages: Optional[list[str]]) -> None:
             clusters=len(clusters),
             markdown=markdown,
             insights=[cluster_to_insight(c) for c in clusters[:80]],
+            job_id=job.job_id,
         )
         save_report(report)
 

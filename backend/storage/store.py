@@ -91,12 +91,7 @@ def get_latest_report() -> dict | None:
 
 
 def save_report(report: KnowledgeReport) -> int:
-    meta = json.dumps({
-        "videos_processed": report.videos_processed,
-        "transcripts_found": report.transcripts_found,
-        "atoms_extracted": report.atoms_extracted,
-        "clusters": report.clusters,
-    })
+    meta = json.dumps(report.model_dump(exclude={"topic", "markdown", "insights"}))
     with _conn() as con:
         cur = con.execute(
             "INSERT INTO reports (topic, markdown, meta, created_at) VALUES (?,?,?,?)",

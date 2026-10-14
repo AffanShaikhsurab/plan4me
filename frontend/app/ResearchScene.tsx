@@ -31,10 +31,11 @@ const CLUSTER_RING_Z = -0.35;
 const STAGE_INDEX: Record<ResearchStage, number> = {
   search: 0,
   transcribe: 1,
-  extract: 2,
-  cluster: 3,
-  synthesize: 4,
-  done: 5,
+  video_briefs: 2,
+  merge_agenda: 3,
+  deep_research: 4,
+  final_doc: 5,
+  done: 6,
 };
 
 const AMBER = 0xffb257;

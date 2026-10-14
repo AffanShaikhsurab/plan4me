@@ -26,6 +26,7 @@ def select_and_transcribe(
     candidates: list[VideoMeta],
     languages: list[str] | None = None,
     target: int | None = None,
+    skipped: list[dict] | None = None,
 ) -> list[Transcript]:
     s = get_settings()
     target = target or s.target_videos
@@ -33,6 +34,13 @@ def select_and_transcribe(
 
     transcripts: list[Transcript] = []
     selected_ids: set[str] = set()
+
+    def _skip(video: VideoMeta) -> None:
+        if skipped is None:
+            return
+        skipped.append(
+            {"video_id": video.video_id, "title": video.title, "reason": "no_captions"}
+        )
 
     # --- Phase 1: forced top-N (captions, else Deepgram) ---
     forced = candidates[:force_n]
@@ -45,6 +53,7 @@ def select_and_transcribe(
             selected_ids.add(v.video_id)
         else:
             logger.info("forced video %s produced no transcript; skipping", v.video_id)
+            _skip(v)
 
     # --- Phase 2: fill remaining slots with caption-having candidates ---
     for v in candidates[force_n:]:
@@ -56,6 +65,8 @@ def select_and_transcribe(
         if t and t.snippets:
             transcripts.append(t)
             selected_ids.add(v.video_id)
+        else:
+            _skip(v)
 
     logger.info(
         "selected %d/%d transcripts from %d candidates (forced top %d)",

@@ -37,6 +37,10 @@ export interface KnowledgeReport {
   clusters: number;
   markdown: string;
   insights: ClusterInsight[];
+  candidates_searched?: number;
+  videos_skipped?: number;
+  concepts_deep_researched?: number;
+  job_id?: string;
 }
 
 export interface HealthInfo {
@@ -58,9 +62,10 @@ export interface HealthInfo {
 export type ResearchStage =
   | "search"
   | "transcribe"
-  | "extract"
-  | "cluster"
-  | "synthesize"
+  | "video_briefs"
+  | "merge_agenda"
+  | "deep_research"
+  | "final_doc"
   | "done";
 
 export interface ResearchCounts {

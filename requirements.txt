@@ -24,5 +24,10 @@ yt-dlp>=2025.1.15
 youtube-transcript-api>=1.0.0
 deepgram-sdk>=7.6.0
 
+# Deep pass: public web search and main-text extraction
+ddgs>=9.0.0
+trafilatura>=2.0.0
+httpx>=0.27.0
+
 # ---- Optional: local transcription fallback (may lack wheels on Py3.14) ----
 # Install separately:  pip install -r requirements-whisper.txt
